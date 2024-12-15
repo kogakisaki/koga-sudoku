@@ -14,6 +14,7 @@ class GameController {
       const gameData = {
         id: gameId,
         ...game,
+        userValues: [], // Initialize empty array for user values
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       };
@@ -35,6 +36,11 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
+      // Initialize userValues if not present
+      if (!game.userValues) {
+        game.userValues = [];
+      }
+
       res.json(game);
     } catch (error) {
       res.status(500).json({ error: "Failed to get game" });
@@ -51,10 +57,42 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
+      // Initialize userValues if not present
+      if (!game.userValues) {
+        game.userValues = [];
+      }
+
+      // Handle delete move (value = 0)
+      if (value === 0) {
+        // Remove from userValues if it exists
+        const index = game.userValues.findIndex(
+          (v) => v.row === row && v.col === col
+        );
+        if (index !== -1) {
+          game.userValues.splice(index, 1);
+        }
+        game.board[row][col] = 0;
+        game.lastUpdated = new Date().toISOString();
+
+        await this.saveGame(id, game);
+        return res.json({
+          isValid: true,
+          game,
+          isComplete: false,
+          isFailed: false,
+        });
+      }
+
+      // Handle regular move
       const isValid = GameModel.validateMove(game, row, col, value);
       if (isValid) {
         game.board[row][col] = value;
         game.lastUpdated = new Date().toISOString();
+
+        // Add to userValues if not already present
+        if (!game.userValues.some((v) => v.row === row && v.col === col)) {
+          game.userValues.push({ row, col });
+        }
 
         if (GameModel.isGameComplete(game)) {
           game.status = "completed";
@@ -75,6 +113,7 @@ class GameController {
         isFailed: game.status === "failed",
       });
     } catch (error) {
+      console.error("Make move error:", error);
       res.status(500).json({ error: "Failed to make move" });
     }
   }
@@ -92,6 +131,7 @@ class GameController {
       const gameData = {
         id,
         ...newGame,
+        userValues: [], // Reset user values for new game
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       };
@@ -100,6 +140,45 @@ class GameController {
       res.json(gameData);
     } catch (error) {
       res.status(500).json({ error: "Failed to retry game" });
+    }
+  }
+
+  async deleteMove(req, res) {
+    try {
+      const { id } = req.params;
+      const { row, col } = req.body;
+      const game = await this.loadGame(id);
+
+      if (!game) {
+        return res.status(404).json({ error: "Game not found" });
+      }
+
+      // Initialize userValues if not present
+      if (!game.userValues) {
+        game.userValues = [];
+      }
+
+      // Remove from userValues if it exists
+      const index = game.userValues.findIndex(
+        (v) => v.row === row && v.col === col
+      );
+      if (index !== -1) {
+        game.userValues.splice(index, 1);
+      }
+
+      game.board[row][col] = 0;
+      game.lastUpdated = new Date().toISOString();
+
+      await this.saveGame(id, game);
+      res.json({
+        isValid: true,
+        game,
+        isComplete: false,
+        isFailed: false,
+      });
+    } catch (error) {
+      console.error("Delete move error:", error);
+      res.status(500).json({ error: "Failed to delete move" });
     }
   }
 

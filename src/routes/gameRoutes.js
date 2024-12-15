@@ -9,4 +9,7 @@ router.get('/:id', (req, res) => gameController.getGame(req, res));
 router.put('/:id/move', (req, res) => gameController.makeMove(req, res));
 router.put('/:id/retry', (req, res) => gameController.retryGame(req, res));
 
+// Add new route for delete operation
+router.delete('/:id/move', (req, res) => gameController.deleteMove(req, res));
+
 module.exports = router;

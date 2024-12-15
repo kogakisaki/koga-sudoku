@@ -22,6 +22,7 @@ class GameModel {
       mistakes: 0,
       maxMistakes: 3,
       timer: 0,
+      userValues: [], // Initialize userValues array
     };
   }
 
@@ -98,6 +99,7 @@ class GameModel {
   }
 
   static validateMove(game, row, col, value) {
+    if (value === 0) return true; // Allow deletion
     return game.solution[row][col] === value;
   }
 
@@ -116,6 +118,32 @@ class GameModel {
       [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+  }
+
+  // New helper methods for user values
+  static isUserValue(game, row, col) {
+    return game.userValues?.some((v) => v.row === row && v.col === col);
+  }
+
+  static addUserValue(game, row, col) {
+    if (!game.userValues) {
+      game.userValues = [];
+    }
+    if (!this.isUserValue(game, row, col)) {
+      game.userValues.push({ row, col });
+    }
+  }
+
+  static removeUserValue(game, row, col) {
+    if (!game.userValues) return;
+
+    const index = game.userValues.findIndex(
+      (v) => v.row === row && v.col === col
+    );
+
+    if (index !== -1) {
+      game.userValues.splice(index, 1);
+    }
   }
 }
 

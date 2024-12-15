@@ -13,6 +13,10 @@
   --error-color: #ff4444;
   --correct-color: #00c853;
   --highlight-color: rgba(232, 240, 254, 0.6);
+  --highlight-user-value: rgba(76, 175, 80, 0.3);
+  --highlight-focus-value: rgba(33, 150, 243, 0.3);
+  --user-input-color: #2196f3;
+  --initial-number-color: var(--text-color);
   --easy-color: #4caf50;
   --medium-color: #2196f3;
   --hard-color: #f44336;
@@ -31,6 +35,10 @@
   --cell-bg: #2d2d2d;
   --disabled-bg: #383838;
   --highlight-color: rgba(58, 58, 58, 0.6);
+  --highlight-user-value: rgba(76, 175, 80, 0.2);
+  --highlight-focus-value: rgba(33, 150, 243, 0.2);
+  --user-input-color: #64b5f6;
+  --initial-number-color: var(--text-color);
   --shadow-color: rgba(0, 0, 0, 0.3);
 }
 
@@ -274,7 +282,7 @@ body {
   font-size: 24px;
   font-weight: 500;
   background: transparent;
-  color: var(--text-color);
+  color: var(--initial-number-color);
   cursor: pointer;
 }
 
@@ -284,12 +292,33 @@ body {
   cursor: not-allowed;
 }
 
+.cell input:not(:disabled) {
+  color: var(--user-input-color);
+}
+
 .cell.highlighted {
   background: var(--highlight-color);
 }
 
+.cell.highlighted-user-value {
+  background: var(--highlight-user-value);
+}
+
+.cell.highlighted-focus-value {
+  background: var(--highlight-focus-value);
+}
+
 .cell.selected {
   background: var(--hover-color);
+}
+
+.cell.error input {
+  color: var(--error-color);
+  animation: shake 0.3s ease-in-out;
+}
+
+.cell.correct input {
+  color: var(--correct-color);
 }
 
 /* Game Controls */

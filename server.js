@@ -47,14 +47,13 @@ app.get("/api/games/:id/image", async (req, res) => {
     const gameData = JSON.parse(await fs.readFile(gamePath, "utf8"));
 
     // Dimensions
-    const gridLabelSize = 30; // Size for row/column labels
+    const gridLabelSize = 30;
     const padding = 40;
     const cellSize = 50;
     const boardSize = cellSize * 9;
     const headerHeight = 60;
     const footerHeight = 40;
 
-    // Calculate total width and height including labels
     const totalBoardWidth = boardSize + gridLabelSize;
     const totalBoardHeight = boardSize + gridLabelSize;
     const canvasWidth = totalBoardWidth + padding * 2;
@@ -64,6 +63,7 @@ app.get("/api/games/:id/image", async (req, res) => {
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext("2d");
 
+    // Match the CSS variables from style.css
     const colors =
       theme === "dark"
         ? {
@@ -71,41 +71,44 @@ app.get("/api/games/:id/image", async (req, res) => {
             lines: "#ffffff",
             text: "#ffffff",
             gridLabels: "rgba(255, 255, 255, 0.7)",
+            userInput: "#64b5f6", // Matches dark theme --user-input-color
+            highlight: "rgba(76, 175, 80, 0.2)", // Matches dark theme --highlight-user-value
+            initial: "#ffffff", // Matches dark theme --initial-number-color
           }
         : {
             background: "#ffffff",
             lines: "#000000",
             text: "#000000",
             gridLabels: "rgba(0, 0, 0, 0.7)",
+            userInput: "#2196f3", // Matches light theme --user-input-color
+            highlight: "rgba(76, 175, 80, 0.3)", // Matches light theme --highlight-user-value
+            initial: "#333333", // Matches light theme --initial-number-color
           };
 
     // Draw background
     ctx.fillStyle = colors.background;
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Draw header (Sudoku title)
+    // Draw header
     ctx.font = '32px "Rubik Bold"';
     ctx.fillStyle = colors.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("Sudoku", canvasWidth / 2, padding + headerHeight / 2);
 
-    // Calculate board position - adjusted left position
-    const boardLeft = padding + gridLabelSize / 2; // Reduced the left offset
+    const boardLeft = padding + gridLabelSize / 2;
     const boardTop = padding + headerHeight + gridLabelSize;
 
-    // Draw row numbers (1-9)
+    // Draw grid labels
     ctx.font = '16px "Rubik Medium"';
     ctx.fillStyle = colors.gridLabels;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+
     for (let i = 0; i < 9; i++) {
       const y = boardTop + i * cellSize + cellSize / 2;
-      ctx.fillText((i + 1).toString(), padding, y); // Adjusted x position
-    }
+      ctx.fillText((i + 1).toString(), padding, y);
 
-    // Draw column numbers (1-9)
-    for (let i = 0; i < 9; i++) {
       const x = boardLeft + i * cellSize + cellSize / 2;
       ctx.fillText((i + 1).toString(), x, boardTop - gridLabelSize / 2);
     }
@@ -116,6 +119,15 @@ app.get("/api/games/:id/image", async (req, res) => {
         const x = boardLeft + j * cellSize;
         const y = boardTop + i * cellSize;
 
+        // Highlight user input cells
+        const isUserValue = gameData.userValues?.some(
+          (v) => v.row === i && v.col === j
+        );
+        if (isUserValue) {
+          ctx.fillStyle = colors.highlight;
+          ctx.fillRect(x, y, cellSize, cellSize);
+        }
+
         // Draw cell borders
         ctx.strokeStyle = colors.lines;
         ctx.lineWidth = 1;
@@ -123,8 +135,8 @@ app.get("/api/games/:id/image", async (req, res) => {
 
         // Draw numbers
         if (gameData.board[i][j] !== 0) {
-          ctx.font = "24px Rubik";
-          ctx.fillStyle = colors.text;
+          ctx.font = isUserValue ? "24px Rubik" : '24px "Rubik Bold"';
+          ctx.fillStyle = isUserValue ? colors.userInput : colors.initial;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(
@@ -136,10 +148,12 @@ app.get("/api/games/:id/image", async (req, res) => {
       }
     }
 
-    // Draw thicker lines for 3x3 boxes
+    // Draw 3x3 box borders
     ctx.lineWidth = 3;
     for (let i = 0; i <= 9; i++) {
       if (i % 3 === 0) {
+        ctx.strokeStyle = colors.lines;
+
         // Vertical lines
         ctx.beginPath();
         ctx.moveTo(boardLeft + i * cellSize, boardTop);

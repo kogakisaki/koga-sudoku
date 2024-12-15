@@ -91,17 +91,29 @@ class SudokuGame {
         const value = this.gameData.board[i][j];
         if (value !== 0) {
           input.value = value;
-          input.disabled = true;
-          input.classList.add("initial");
+          if (!this.isUserValue(i, j)) {
+            input.disabled = true;
+            input.classList.add("initial");
+          }
         }
 
         cell.appendChild(input);
         board.appendChild(cell);
+
+        // Add highlighting for user values
+        if (this.isUserValue(i, j)) {
+          cell.classList.add("highlighted-user-value");
+        }
       }
     }
 
-    // Add input event listeners after creating the board
     this.addCellListeners();
+  }
+
+  isUserValue(row, col) {
+    return this.gameData.userValues?.some(
+      (v) => v.row === row && v.col === col
+    );
   }
 
   addCellListeners() {
@@ -112,107 +124,12 @@ class SudokuGame {
     });
   }
 
-  initializeEventListeners() {
-    // Welcome Screen
-    document.getElementById("newGameBtn").addEventListener("click", () => {
-      this.showScreen("difficulty");
-    });
-
-    document.getElementById("loadGameBtn").addEventListener("click", () => {
-      const gameId = document.getElementById("gameIdInput").value.trim();
-      if (gameId) this.loadGame(gameId);
-    });
-
-    // Game ID Input
-    document.getElementById("gameIdInput").addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        const gameId = e.target.value.trim();
-        if (gameId) this.loadGame(gameId);
-      }
-    });
-
-    // Difficulty Selection
-    document
-      .querySelectorAll(".difficulty-buttons button")
-      .forEach((button) => {
-        button.addEventListener("click", () =>
-          this.startNewGame(button.dataset.difficulty)
-        );
-      });
-
-    // Game Controls
-    document
-      .getElementById("retryBtn")
-      .addEventListener("click", () => this.retryGame());
-    document
-      .getElementById("mainMenuBtn")
-      .addEventListener("click", () => this.returnToMainMenu());
-    document
-      .getElementById("validateBtn")
-      .addEventListener("click", () => this.validateGame());
-    document
-      .getElementById("downloadBtn")
-      .addEventListener("click", () => this.downloadBoard());
-
-    // Theme Toggle
-    document
-      .querySelectorAll("#themeToggle, #themeToggleGame")
-      .forEach((button) => {
-        button.addEventListener("click", () => this.toggleTheme());
-      });
-
-    // Number Pad
-    document.querySelectorAll(".num-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
-          return;
-
-        const number = button.dataset.number;
-        if (number === "0") {
-          // Eraser functionality
-          this.selectedCell.value = "";
-          const row = parseInt(this.selectedCell.dataset.row);
-          const col = parseInt(this.selectedCell.dataset.col);
-          this.gameData.board[row][col] = 0;
-          this.selectedCell.classList.remove("error", "correct");
-        } else {
-          this.makeMove(this.selectedCell, number);
-        }
-      });
-    });
-
-    // Keyboard Input
-    document.addEventListener("keydown", (e) => this.handleKeyPress(e));
-
-    // Back Buttons
-    document.querySelectorAll(".btn-back").forEach((button) => {
-      button.addEventListener("click", () => this.showScreen("welcome"));
-    });
-  }
-
-  showGameId() {
-    const gameIdDisplay = document.getElementById("gameId");
-    if (gameIdDisplay) {
-      gameIdDisplay.textContent = this.gameId;
-    }
-  }
-
-  updateDifficultyBadge(difficulty) {
-    const badge = document.getElementById("difficultyBadge");
-    if (badge) {
-      badge.textContent =
-        difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-      badge.className = `badge ${difficulty}`;
-    }
-  }
-
   handleCellFocus(e) {
     if (this.isPaused || e.target.disabled) return;
 
     this.selectedCell = e.target;
     this.highlightRelatedCells(e.target);
 
-    // Visual feedback for selected cell
     document.querySelectorAll(".cell").forEach((cell) => {
       cell.classList.remove("selected");
     });
@@ -235,57 +152,6 @@ class SudokuGame {
     }
   }
 
-  handleKeyPress(e) {
-    if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
-      return;
-
-    if (/^[1-9]$/.test(e.key)) {
-      this.makeMove(this.selectedCell, e.key);
-    } else if (e.key === "Delete" || e.key === "Backspace") {
-      this.selectedCell.value = "";
-      const row = parseInt(this.selectedCell.dataset.row);
-      const col = parseInt(this.selectedCell.dataset.col);
-      this.gameData.board[row][col] = 0;
-      this.selectedCell.classList.remove("error", "correct");
-    } else if (
-      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
-    ) {
-      e.preventDefault();
-      this.moveFocus(e.key);
-    }
-  }
-
-  // Cell Navigation
-  moveFocus(direction) {
-    if (!this.selectedCell) return;
-
-    const row = parseInt(this.selectedCell.dataset.row);
-    const col = parseInt(this.selectedCell.dataset.col);
-    let newRow = row;
-    let newCol = col;
-
-    switch (direction) {
-      case "ArrowUp":
-        newRow = Math.max(0, row - 1);
-        break;
-      case "ArrowDown":
-        newRow = Math.min(8, row + 1);
-        break;
-      case "ArrowLeft":
-        newCol = Math.max(0, col - 1);
-        break;
-      case "ArrowRight":
-        newCol = Math.min(8, col + 1);
-        break;
-    }
-
-    const nextCell = document.querySelector(
-      `input[data-row="${newRow}"][data-col="${newCol}"]`
-    );
-    if (nextCell) nextCell.focus();
-  }
-
-  // Cell Highlighting
   highlightRelatedCells(cell) {
     const row = parseInt(cell.dataset.row);
     const col = parseInt(cell.dataset.col);
@@ -295,6 +161,13 @@ class SudokuGame {
       const inputRow = parseInt(input.dataset.row);
       const inputCol = parseInt(input.dataset.col);
       const cellDiv = input.parentElement;
+
+      // Remove all highlight classes first
+      cellDiv.classList.remove(
+        "highlighted",
+        "highlighted-user-value",
+        "highlighted-focus-value"
+      );
 
       // Highlight same row, column, and 3x3 box
       if (
@@ -306,19 +179,35 @@ class SudokuGame {
         cellDiv.classList.add("highlighted");
       }
 
+      // Highlight user values
+      if (this.isUserValue(inputRow, inputCol)) {
+        cellDiv.classList.add("highlighted-user-value");
+      }
+
       // Highlight same numbers
       if (value && input.value === value) {
-        cellDiv.classList.add("highlighted");
+        cellDiv.classList.add("highlighted-focus-value");
       }
     });
   }
 
   removeHighlight() {
     document.querySelectorAll(".cell").forEach((cell) => {
-      cell.classList.remove("highlighted");
+      cell.classList.remove(
+        "highlighted",
+        "highlighted-user-value",
+        "highlighted-focus-value"
+      );
+
+      // Restore user value highlight if applicable
+      const input = cell.querySelector("input");
+      const row = parseInt(input.dataset.row);
+      const col = parseInt(input.dataset.col);
+      if (this.isUserValue(row, col)) {
+        cell.classList.add("highlighted-user-value");
+      }
     });
   }
-
   // Game Moves
   async makeMove(cell, value) {
     if (!this.gameId || cell.disabled || this.isPaused) return;
@@ -339,12 +228,15 @@ class SudokuGame {
       if (!response.ok) throw new Error("Failed to make move");
 
       const data = await response.json();
+      this.gameData = data.game;
 
       if (data.isValid) {
         cell.value = value;
         cell.classList.remove("error");
         cell.classList.add("correct");
-        this.gameData.board[row][col] = numValue;
+
+        // Update visual state for user value
+        cell.parentElement.classList.add("highlighted-user-value");
 
         if (data.isComplete) {
           this.handleGameWin();
@@ -356,12 +248,60 @@ class SudokuGame {
         setTimeout(() => {
           cell.classList.remove("error");
           cell.value = "";
-          this.gameData.board[row][col] = 0;
+          cell.parentElement.classList.remove("highlighted-user-value");
         }, 1000);
       }
     } catch (error) {
       console.error("Error making move:", error);
       alert("Failed to make move");
+    }
+  }
+
+  async deleteMove(cell) {
+    if (!this.gameId || cell.disabled || this.isPaused) return;
+
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+
+    try {
+      const response = await fetch(`/api/games/${this.gameId}/move`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ row, col, value: 0 }), // Send 0 to indicate deletion
+      });
+
+      if (!response.ok) throw new Error("Failed to delete move");
+
+      const data = await response.json();
+      this.gameData = data.game;
+
+      cell.value = "";
+      cell.classList.remove("error", "correct");
+      cell.parentElement.classList.remove("highlighted-user-value");
+
+      // Remove from visual highlighting
+      this.highlightRelatedCells(cell);
+    } catch (error) {
+      console.error("Error deleting move:", error);
+      alert("Failed to delete move");
+    }
+  }
+
+  handleKeyPress(e) {
+    if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
+      return;
+
+    if (/^[1-9]$/.test(e.key)) {
+      this.makeMove(this.selectedCell, e.key);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      this.deleteMove(this.selectedCell);
+    } else if (
+      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
+    ) {
+      e.preventDefault();
+      this.moveFocus(e.key);
     }
   }
 
@@ -439,7 +379,6 @@ class SudokuGame {
       "mistakes"
     ).textContent = `${this.gameData.mistakes}/${this.gameData.maxMistakes}`;
   }
-
   // Timer Management
   startTimer() {
     if (this.timerInterval) clearInterval(this.timerInterval);
@@ -490,16 +429,6 @@ class SudokuGame {
     document.getElementById("victoryModal").classList.add("active");
   }
 
-  // Navigation
-  returnToMainMenu() {
-    this.stopTimer();
-    this.gameId = null;
-    this.gameData = null;
-    this.selectedCell = null;
-    document.getElementById("gameIdInput").value = "";
-    this.showScreen("welcome");
-  }
-
   // Board Download
   async downloadBoard() {
     if (!this.gameId) return;
@@ -527,6 +456,32 @@ class SudokuGame {
     }
   }
 
+  // Navigation and UI Updates
+  returnToMainMenu() {
+    this.stopTimer();
+    this.gameId = null;
+    this.gameData = null;
+    this.selectedCell = null;
+    document.getElementById("gameIdInput").value = "";
+    this.showScreen("welcome");
+  }
+
+  showGameId() {
+    const gameIdDisplay = document.getElementById("gameId");
+    if (gameIdDisplay) {
+      gameIdDisplay.textContent = this.gameId;
+    }
+  }
+
+  updateDifficultyBadge(difficulty) {
+    const badge = document.getElementById("difficultyBadge");
+    if (badge) {
+      badge.textContent =
+        difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+      badge.className = `badge ${difficulty}`;
+    }
+  }
+
   // Theme Management
   toggleTheme() {
     const body = document.body;
@@ -542,6 +497,11 @@ class SudokuGame {
       body.setAttribute("data-theme", "dark");
       icons.forEach((icon) => (icon.className = "fas fa-sun"));
       localStorage.setItem("theme", "dark");
+    }
+
+    // Update board highlighting for current theme
+    if (this.selectedCell) {
+      this.highlightRelatedCells(this.selectedCell);
     }
   }
 
@@ -560,12 +520,191 @@ class SudokuGame {
     document.querySelectorAll(".modal").forEach((modal) => {
       modal.classList.remove("active");
     });
+    this.isPaused = false;
+    if (this.gameData && this.gameData.status === "active") {
+      this.startTimer();
+    }
+  }
+
+  // Event Listeners Management
+  initializeModalListeners() {
+    // Game Over Modal
+    document.getElementById("retryGameBtn").addEventListener("click", () => {
+      this.hideModals();
+      this.retryGame();
+    });
+
+    document.getElementById("quitToMenuBtn").addEventListener("click", () => {
+      this.hideModals();
+      this.returnToMainMenu();
+    });
+
+    // Victory Modal
+    document
+      .getElementById("newGameAfterWinBtn")
+      .addEventListener("click", () => {
+        this.hideModals();
+        this.returnToMainMenu();
+      });
+
+    // Close modals when clicking outside
+    document.querySelectorAll(".modal").forEach((modal) => {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          this.hideModals();
+        }
+      });
+    });
+  }
+  // Initialize all event listeners
+  initializeEventListeners() {
+    // Welcome Screen
+    document.getElementById("newGameBtn").addEventListener("click", () => {
+      this.showScreen("difficulty");
+    });
+
+    document.getElementById("loadGameBtn").addEventListener("click", () => {
+      const gameId = document.getElementById("gameIdInput").value.trim();
+      if (gameId) this.loadGame(gameId);
+    });
+
+    // Game ID Input
+    document.getElementById("gameIdInput").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const gameId = e.target.value.trim();
+        if (gameId) this.loadGame(gameId);
+      }
+    });
+
+    // Difficulty Selection
+    document
+      .querySelectorAll(".difficulty-buttons button")
+      .forEach((button) => {
+        button.addEventListener("click", () =>
+          this.startNewGame(button.dataset.difficulty)
+        );
+      });
+
+    // Game Controls
+    document
+      .getElementById("retryBtn")
+      .addEventListener("click", () => this.retryGame());
+
+    document
+      .getElementById("mainMenuBtn")
+      .addEventListener("click", () => this.returnToMainMenu());
+
+    document
+      .getElementById("validateBtn")
+      .addEventListener("click", () => this.validateGame());
+
+    document
+      .getElementById("downloadBtn")
+      .addEventListener("click", () => this.downloadBoard());
+
+    // Theme Toggle
+    document
+      .querySelectorAll("#themeToggle, #themeToggleGame")
+      .forEach((button) => {
+        button.addEventListener("click", () => this.toggleTheme());
+      });
+
+    // Number Pad
+    document.querySelectorAll(".num-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
+          return;
+
+        const number = button.dataset.number;
+        if (number === "0") {
+          // Eraser functionality
+          this.deleteMove(this.selectedCell);
+        } else {
+          this.makeMove(this.selectedCell, number);
+        }
+      });
+    });
+
+    // Keyboard Input
+    document.addEventListener("keydown", (e) => this.handleKeyPress(e));
+
+    // Back Buttons
+    document.querySelectorAll(".btn-back").forEach((button) => {
+      button.addEventListener("click", () => this.showScreen("welcome"));
+    });
+
+    // Initialize modal listeners
+    this.initializeModalListeners();
+  }
+
+  // Cell Navigation
+  moveFocus(direction) {
+    if (!this.selectedCell) return;
+
+    const row = parseInt(this.selectedCell.dataset.row);
+    const col = parseInt(this.selectedCell.dataset.col);
+    let newRow = row;
+    let newCol = col;
+
+    switch (direction) {
+      case "ArrowUp":
+        newRow = Math.max(0, row - 1);
+        break;
+      case "ArrowDown":
+        newRow = Math.min(8, row + 1);
+        break;
+      case "ArrowLeft":
+        newCol = Math.max(0, col - 1);
+        break;
+      case "ArrowRight":
+        newCol = Math.min(8, col + 1);
+        break;
+    }
+
+    const nextCell = document.querySelector(
+      `input[data-row="${newRow}"][data-col="${newCol}"]`
+    );
+    if (nextCell) {
+      nextCell.focus();
+      this.highlightRelatedCells(nextCell);
+    }
+  }
+
+  // Helper Methods
+  isValidPosition(row, col) {
+    return row >= 0 && row < 9 && col >= 0 && col < 9;
+  }
+
+  getBoxStart(index) {
+    return Math.floor(index / 3) * 3;
+  }
+
+  getCellsInSameUnit(row, col) {
+    const cells = new Set();
+    // Add cells in same row
+    for (let i = 0; i < 9; i++) {
+      cells.add(`${row},${i}`);
+    }
+    // Add cells in same column
+    for (let i = 0; i < 9; i++) {
+      cells.add(`${i},${col}`);
+    }
+    // Add cells in same box
+    const boxRow = this.getBoxStart(row);
+    const boxCol = this.getBoxStart(col);
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        cells.add(`${boxRow + i},${boxCol + j}`);
+      }
+    }
+    return cells;
   }
 }
 
+// Create game instance
 const game = new SudokuGame();
 
-// Service Worker Registration (Optional)
+// Service Worker Registration
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").catch((error) => {
@@ -573,3 +712,26 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+// Handle visibility change for timer management
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    game.isPaused = true;
+  } else {
+    game.isPaused = false;
+  }
+});
+
+// Handle window focus/blur for timer management
+window.addEventListener("blur", () => {
+  game.isPaused = true;
+});
+
+window.addEventListener("focus", () => {
+  game.isPaused = false;
+});
+
+// Prevent zooming on mobile devices
+document.addEventListener("gesturestart", function (e) {
+  e.preventDefault();
+});
