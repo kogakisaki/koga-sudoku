@@ -135,7 +135,7 @@ app.get("/api/games/:id/image", async (req, res) => {
 
         // Draw numbers
         if (gameData.board[i][j] !== 0) {
-          ctx.font = isUserValue ? "24px Rubik" : '24px "Rubik Bold"';
+          ctx.font = isUserValue ? "24px Rubik Bold" : '24px "Rubik"';
           ctx.fillStyle = isUserValue ? colors.userInput : colors.initial;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
