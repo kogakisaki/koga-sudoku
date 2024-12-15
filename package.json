@@ -1,0 +1,19 @@
+{
+  "name": "koga-sudoku",
+  "version": "1.0.0",
+  "description": "Sudoku game with backend API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "canvas": "^2.10.2",
+    "cors": "latest",
+    "express": "latest",
+    "uuid": "latest"
+  },
+  "devDependencies": {
+    "nodemon": "latest"
+  }
+}

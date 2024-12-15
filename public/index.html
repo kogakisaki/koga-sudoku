@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sudoku Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Welcome Screen -->
+      <div id="welcomeScreen" class="screen active">
+        <div class="welcome-header">
+          <h1><i class="fas fa-puzzle-piece"></i> Sudoku</h1>
+          <button id="themeToggle" class="btn-theme">
+            <i class="fas fa-moon"></i>
+          </button>
+        </div>
+        <div class="welcome-content">
+          <button id="newGameBtn" class="btn-primary">
+            <i class="fas fa-play"></i> New Game
+          </button>
+          <div class="load-game-section">
+            <div class="input-group">
+              <input type="text" id="gameIdInput" placeholder="Enter Game ID" />
+              <button id="loadGameBtn" class="btn-secondary">
+                <i class="fas fa-folder-open"></i> Load
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Difficulty Screen -->
+      <div id="difficultyScreen" class="screen">
+        <h2>Select Difficulty</h2>
+        <div class="difficulty-buttons">
+          <button data-difficulty="easy" class="btn-easy">
+            <i class="fas fa-feather"></i> Easy
+          </button>
+          <button data-difficulty="medium" class="btn-medium">
+            <i class="fas fa-chess-knight"></i> Medium
+          </button>
+          <button data-difficulty="hard" class="btn-hard">
+            <i class="fas fa-dragon"></i> Hard
+          </button>
+        </div>
+        <button class="btn-back"><i class="fas fa-arrow-left"></i> Back</button>
+      </div>
+
+      <!-- Game Screen -->
+      <div id="gameScreen" class="screen">
+        <div class="game-section">
+          <div class="game-header">
+            <div class="game-info">
+              <div class="game-title">
+                <h2>Sudoku</h2>
+                <div class="game-status">
+                  <span id="difficultyBadge" class="badge">Easy</span>
+                  <div class="game-id-box">
+                    <i class="fas fa-hashtag"></i>
+                    <span id="gameId"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="game-stats">
+                <div class="timer">
+                  <i class="far fa-clock"></i>
+                  <span id="timer">00:00</span>
+                </div>
+                <div class="mistakes">
+                  <i class="fas fa-times-circle"></i>
+                  <span id="mistakes">0/3</span>
+                </div>
+              </div>
+            </div>
+            <div class="game-controls">
+              <div class="control-buttons">
+                <button
+                  id="themeToggleGame"
+                  class="btn-control"
+                  title="Toggle Theme"
+                >
+                  <i class="fas fa-moon"></i>
+                </button>
+                <button
+                  id="downloadBtn"
+                  class="btn-control"
+                  title="Download Board"
+                >
+                  <i class="fas fa-download"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="board-container">
+            <div class="board" id="board"></div>
+          </div>
+
+          <div class="controls-container">
+            <div class="game-actions">
+              <button id="validateBtn" class="btn-check">
+                <i class="fas fa-check-circle"></i> Check
+              </button>
+              <button id="retryBtn" class="btn-retry">
+                <i class="fas fa-redo"></i> Retry
+              </button>
+              <button id="mainMenuBtn" class="btn-menu">
+                <i class="fas fa-home"></i> Menu
+              </button>
+            </div>
+
+            <div class="number-pad">
+              <button class="num-btn" data-number="1">1</button>
+              <button class="num-btn" data-number="2">2</button>
+              <button class="num-btn" data-number="3">3</button>
+              <button class="num-btn" data-number="4">4</button>
+              <button class="num-btn" data-number="5">5</button>
+              <button class="num-btn" data-number="6">6</button>
+              <button class="num-btn" data-number="7">7</button>
+              <button class="num-btn" data-number="8">8</button>
+              <button class="num-btn" data-number="9">9</button>
+              <button class="num-btn erase" data-number="0">
+                <i class="fas fa-eraser"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Over Modal -->
+      <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+          <h2>Game Over</h2>
+          <p>Too many mistakes! Would you like to try again?</p>
+          <div class="modal-buttons">
+            <button id="retryGameBtn" class="btn-primary">
+              <i class="fas fa-redo"></i> Retry
+            </button>
+            <button id="quitToMenuBtn" class="btn-secondary">
+              <i class="fas fa-home"></i> Main Menu
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Victory Modal -->
+      <div id="victoryModal" class="modal">
+        <div class="modal-content">
+          <h2>Congratulations!</h2>
+          <p>You've completed the puzzle!</p>
+          <div class="stats">
+            <p>Time: <span id="finalTime">00:00</span></p>
+            <p>Mistakes: <span id="finalMistakes">0</span></p>
+          </div>
+          <div class="modal-buttons">
+            <button id="newGameAfterWinBtn" class="btn-primary">
+              <i class="fas fa-play"></i> New Game
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/script.js"></script>
+  </body>
+</html>
