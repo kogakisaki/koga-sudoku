@@ -56,6 +56,15 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
+      if (game.status === "failed") {
+        return res.json({
+          isValid: false,
+          game,
+          isComplete: false,
+          isFailed: true,
+        });
+      }
+
       if (!game.userValues) {
         game.userValues = [];
       }
@@ -239,6 +248,27 @@ class GameController {
       return JSON.parse(data);
     } catch (error) {
       return null;
+    }
+  }
+
+  async saveGameState(req, res) {
+    try {
+      const { id } = req.params;
+      const { timer } = req.body;
+      const game = await this.loadGame(id);
+
+      if (!game) {
+        return res.status(404).json({ error: "Game not found" });
+      }
+
+      game.timer = timer;
+      game.lastUpdated = new Date().toISOString();
+
+      await this.saveGame(id, game);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Save game state error:", error);
+      res.status(500).json({ error: "Failed to save game state" });
     }
   }
 }

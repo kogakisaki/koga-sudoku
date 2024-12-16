@@ -41,7 +41,8 @@ app.use("/api/games", gameRoutes);
 app.get("/api/games/:id/image", async (req, res) => {
   try {
     const { id } = req.params;
-    const { theme = "light" } = req.query;
+    const { theme = "light", check = "false" } = req.query;
+    const showValidation = check === "true";
 
     const gamePath = path.join(__dirname, "src/data/games", `${id}.json`);
     const gameData = JSON.parse(await fs.readFile(gamePath, "utf8"));
@@ -63,6 +64,20 @@ app.get("/api/games/:id/image", async (req, res) => {
     const canvas = createCanvas(canvasWidth, canvasHeight);
     const ctx = canvas.getContext("2d");
 
+    const formatTime = (seconds) => {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainingSeconds = seconds % 60;
+
+      if (hours > 0) {
+        return `${hours}h ${minutes}m ${remainingSeconds}s`;
+      } else if (minutes > 0) {
+        return `${minutes}m ${remainingSeconds}s`;
+      } else {
+        return `${remainingSeconds}s`;
+      }
+    };
+
     // Match the CSS variables from style.css
     const colors =
       theme === "dark"
@@ -72,9 +87,11 @@ app.get("/api/games/:id/image", async (req, res) => {
             text: "#ffffff",
             gridLabels: "rgba(255, 255, 255, 0.7)",
             userInput: "#64b5f6",
-            highlight: "rgba(76, 175, 80, 0.2)",
+            highlight: "rgba(255, 193, 7, 0.15)", // Yellow highlight for dark theme
             initial: "#ffffff",
             overlay: "rgba(42, 42, 42, 0.8)",
+            error: "rgba(255, 68, 68, 0.15)", // Red background for errors
+            errorText: "#ff4444", // Red color for invalid numbers
           }
         : {
             background: "#ffffff",
@@ -82,9 +99,11 @@ app.get("/api/games/:id/image", async (req, res) => {
             text: "#000000",
             gridLabels: "rgba(0, 0, 0, 0.7)",
             userInput: "#2196f3",
-            highlight: "rgba(76, 175, 80, 0.3)",
+            highlight: "rgba(255, 193, 7, 0.2)", // Yellow highlight for light theme
             initial: "#333333",
             overlay: "rgba(255, 255, 255, 0.8)",
+            error: "rgba(255, 68, 68, 0.2)", // Red background for errors
+            errorText: "#ff4444", // Red color for invalid numbers
           };
 
     // Draw background
@@ -120,12 +139,18 @@ app.get("/api/games/:id/image", async (req, res) => {
       for (let j = 0; j < 9; j++) {
         const x = boardLeft + j * cellSize;
         const y = boardTop + i * cellSize;
-
-        // Highlight user input cells
+        const currentValue = gameData.board[i][j];
         const isUserValue = gameData.userValues?.some(
           (v) => v.row === i && v.col === j
         );
-        if (isUserValue) {
+
+        // Fill cell background
+        if (!gameData.board[i][j] && showValidation) {
+          // Empty cell with validation
+          ctx.fillStyle = colors.error;
+          ctx.fillRect(x, y, cellSize, cellSize);
+        } else if (isUserValue && !showValidation) {
+          // User input cell without validation
           ctx.fillStyle = colors.highlight;
           ctx.fillRect(x, y, cellSize, cellSize);
         }
@@ -136,13 +161,26 @@ app.get("/api/games/:id/image", async (req, res) => {
         ctx.strokeRect(x, y, cellSize, cellSize);
 
         // Draw numbers
-        if (gameData.board[i][j] !== 0) {
+        if (currentValue !== 0) {
           ctx.font = isUserValue ? "24px Rubik Bold" : '24px "Rubik"';
-          ctx.fillStyle = isUserValue ? colors.userInput : colors.initial;
+
+          // Determine text color based on validation and cell type
+          if (
+            showValidation &&
+            isUserValue &&
+            currentValue !== gameData.solution[i][j]
+          ) {
+            ctx.fillStyle = colors.errorText; // Red text for invalid numbers
+          } else if (isUserValue) {
+            ctx.fillStyle = colors.userInput;
+          } else {
+            ctx.fillStyle = colors.initial;
+          }
+
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(
-            gameData.board[i][j].toString(),
+            currentValue.toString(),
             x + cellSize / 2,
             y + cellSize / 2
           );
@@ -170,20 +208,41 @@ app.get("/api/games/:id/image", async (req, res) => {
       }
     }
 
-    // Apply overlay if game is completed or failed
+    // Apply overlay and draw completion message if game is completed or failed
     if (gameData.status === "completed" || gameData.status === "failed") {
+      // Draw semi-transparent overlay
       ctx.fillStyle = colors.overlay;
       ctx.fillRect(boardLeft, boardTop, boardSize, boardSize);
 
-      ctx.fillStyle = colors.text;
+      // Set up text properties for main message
       ctx.font = '24px "Rubik Bold"';
-      ctx.fillText(
-        gameData.status === "completed"
-          ? "Congratulations! Puzzle Completed!"
-          : "Game Over! Too many mistakes!",
-        canvasWidth / 2,
-        boardTop + boardSize / 2
-      );
+      ctx.textAlign = "center";
+
+      // Position for main message and time
+      const messageY = boardTop + boardSize / 2 - 20;
+      const timeY = messageY + 40;
+
+      // Draw main message with appropriate color
+      if (gameData.status === "completed") {
+        ctx.fillStyle = "#00c853"; // Green for win
+        ctx.fillText(
+          "Congratulations! Puzzle Completed!",
+          canvasWidth / 2,
+          messageY
+        );
+      } else {
+        ctx.fillStyle = "#ff4444"; // Red for game over
+        ctx.fillText(
+          "Game Over! Too many mistakes!",
+          canvasWidth / 2,
+          messageY
+        );
+      }
+
+      // Draw time with the same color as the message
+      const timeText = `Total Time: ${formatTime(gameData.timer)}`;
+      ctx.font = '20px "Rubik"';
+      ctx.fillText(timeText, canvasWidth / 2, timeY);
     }
 
     // Draw footer (game ID)

@@ -37,10 +37,16 @@ class SudokuGame {
       const data = await response.json();
       this.gameId = data.gameId;
       this.gameData = data.game;
+      this.isPaused = false; // Reset pause state for new game
 
       this.showScreen("game");
       this.createBoard();
-      this.startTimer();
+
+      // Reset and start timer from 0
+      const timerDisplay = document.getElementById("timer");
+      timerDisplay.textContent = "00:00";
+      this.startTimer(0);
+
       this.updateStats();
       this.updateDifficultyBadge(difficulty);
       this.showGameId();
@@ -71,9 +77,27 @@ class SudokuGame {
       this.gameId = gameId;
       this.gameData = data;
 
+      // Set isPaused based on game status before creating board
+      this.isPaused =
+        this.gameData.status === "failed" ||
+        this.gameData.status === "completed";
+
       this.showScreen("game");
       this.createBoard();
-      this.startTimer();
+
+      // Initialize the timer
+      const timerDisplay = document.getElementById("timer");
+      const minutes = Math.floor(this.gameData.timer / 60);
+      const seconds = this.gameData.timer % 60;
+      timerDisplay.textContent = `${minutes
+        .toString()
+        .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+      // Start timer if game is active
+      if (!this.isPaused) {
+        this.startTimer(this.gameData.timer);
+      }
+
       this.updateStats();
       this.updateDifficultyBadge(data.difficulty);
       this.showGameId();
@@ -131,6 +155,13 @@ class SudokuGame {
     }
 
     this.addCellListeners();
+
+    // Check game status and handle appropriately
+    if (this.gameData.status === "failed") {
+      this.handleGameOver();
+    } else if (this.gameData.status === "completed") {
+      this.handleGameWin();
+    }
   }
 
   isUserValue(row, col) {
@@ -143,9 +174,15 @@ class SudokuGame {
     document.querySelectorAll(".cell input").forEach((input) => {
       input.addEventListener("focus", (e) => this.handleCellFocus(e));
       input.addEventListener("blur", (e) => this.handleCellBlur(e));
-      input.addEventListener("input", (e) => this.handleCellInput(e));
+      input.addEventListener("input", (e) => {
+        // Only handle input events that are not from keyboard
+        if (e.inputType === "insertText") {
+          this.handleCellInput(e);
+        }
+      });
     });
   }
+
   handleCellFocus(e) {
     if (this.isPaused || e.target.disabled) return;
 
@@ -253,26 +290,32 @@ class SudokuGame {
       const data = await response.json();
       this.gameData = data.game;
 
+      // Update UI based on move result
       if (data.isValid || !this.gameData.mistakeChecking) {
         cell.value = value;
         cell.classList.remove("error");
         cell.classList.add("correct");
-
-        // Update visual state for user value
         cell.parentElement.classList.add("highlighted-user-value");
 
         if (data.isComplete) {
           this.handleGameWin();
         }
       } else {
+        cell.value = value; // Show the incorrect value temporarily
         cell.classList.add("error");
         cell.classList.remove("correct");
-        this.handleMistake();
-        setTimeout(() => {
-          cell.classList.remove("error");
-          cell.value = "";
-          cell.parentElement.classList.remove("highlighted-user-value");
-        }, 1000);
+        this.updateStats(); // Update mistakes display immediately
+
+        // Check if game is failed due to max mistakes
+        if (this.gameData.mistakes >= this.gameData.maxMistakes) {
+          this.handleGameOver();
+        } else {
+          setTimeout(() => {
+            cell.classList.remove("error");
+            cell.value = ""; // Clear the value after animation
+            cell.parentElement.classList.remove("highlighted-user-value");
+          }, 1000);
+        }
       }
     } catch (error) {
       console.error("Error making move:", error);
@@ -323,38 +366,43 @@ class SudokuGame {
       let hasErrors = false;
 
       // Reset all cell states first
+      document.querySelectorAll(".cell input").forEach((input) => {
+        input.classList.remove("error", "correct");
+        input.parentElement.classList.remove("error", "empty-error");
+      });
+
+      // Apply validation results for all cells that can be modified
       document
         .querySelectorAll(".cell input:not([disabled])")
         .forEach((input) => {
-          input.classList.remove("error", "correct");
-          input.parentElement.classList.remove("error"); // Remove error from cell div
+          const row = parseInt(input.dataset.row);
+          const col = parseInt(input.dataset.col);
+          const value = input.value;
+
+          // Mark empty cells with a different error style
+          if (!value) {
+            input.parentElement.classList.add("empty-error");
+            hasErrors = true;
+          }
+          // Check non-empty cells against solution
+          else if (parseInt(value) !== this.gameData.solution[row][col]) {
+            input.classList.add("error");
+            hasErrors = true;
+          }
         });
 
-      // Apply validation results
-      data.validation.forEach((result) => {
-        const cell = document.querySelector(
-          `.cell input[data-row="${result.row}"][data-col="${result.col}"]`
-        );
-
-        if (!cell || cell.disabled) return;
-
-        if (result.isEmpty || !result.isValid) {
-          cell.classList.add("error");
-          cell.parentElement.classList.add("error"); // Add error to cell div
-          hasErrors = true;
-        }
-      });
+      // Remove error highlighting after 2 seconds
+      setTimeout(() => {
+        document.querySelectorAll(".cell input.error").forEach((input) => {
+          input.classList.remove("error");
+        });
+        document.querySelectorAll(".cell.empty-error").forEach((cell) => {
+          cell.classList.remove("empty-error");
+        });
+      }, 2000);
 
       if (!hasErrors && data.isComplete) {
         this.handleGameWin();
-      } else if (hasErrors) {
-        // Remove error highlighting after delay
-        setTimeout(() => {
-          document.querySelectorAll(".cell input.error").forEach((input) => {
-            input.classList.remove("error");
-            input.parentElement.classList.remove("error"); // Remove error from cell div
-          });
-        }, 2000);
       }
     } catch (error) {
       console.error("Error checking game:", error);
@@ -362,14 +410,75 @@ class SudokuGame {
     }
   }
 
-  handleMistake() {
-    if (!this.gameData.mistakeChecking) return; // Don't handle mistakes if checking is disabled
+  async makeMove(cell, value) {
+    if (!this.gameId || cell.disabled || this.isPaused) return;
 
-    this.gameData.mistakes++;
-    this.updateStats();
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    const numValue = parseInt(value);
 
-    if (this.gameData.mistakes >= this.gameData.maxMistakes) {
-      this.handleGameOver();
+    try {
+      const response = await fetch(`/api/games/${this.gameId}/move`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ row, col, value: numValue }),
+      });
+
+      if (!response.ok) throw new Error("Failed to make move");
+
+      const data = await response.json();
+      this.gameData = data.game;
+
+      if (data.isValid || !this.gameData.mistakeChecking) {
+        cell.value = value;
+        cell.classList.remove("error");
+        cell.classList.add("correct");
+        cell.parentElement.classList.add("highlighted-user-value");
+
+        // Remove highlighting after 2 seconds
+        setTimeout(() => {
+          cell.parentElement.classList.remove("highlighted-user-value");
+        }, 2000);
+
+        if (data.isComplete) {
+          this.handleGameWin();
+        }
+      } else {
+        cell.value = value;
+        cell.classList.add("error");
+        cell.classList.remove("correct");
+        this.updateStats();
+
+        if (this.gameData.mistakes >= this.gameData.maxMistakes) {
+          this.handleGameOver();
+        } else {
+          setTimeout(() => {
+            cell.classList.remove("error");
+            cell.value = "";
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error("Error making move:", error);
+      alert("Failed to make move");
+    }
+  }
+
+  async updateBoardImage(check = false) {
+    try {
+      const theme = document.body.getAttribute("data-theme") || "light";
+      const url = `/api/games/${this.gameId}/image?theme=${theme}${
+        check ? "&check=true" : ""
+      }`;
+      const response = await fetch(url);
+
+      if (!response.ok) throw new Error("Failed to update board image");
+
+      // You could optionally update a preview or handle the response in some way
+    } catch (error) {
+      console.error("Error updating board image:", error);
     }
   }
 
@@ -377,26 +486,69 @@ class SudokuGame {
     if (!this.gameData) return;
     const mistakeContainer = document.getElementById("mistakes");
     if (this.gameData.mistakeChecking) {
-      mistakeContainer.textContent = `${this.gameData.mistakes}/${this.gameData.maxMistakes}`;
+      const currentMistakes = this.gameData.mistakes || 0;
+      const maxMistakes = this.gameData.maxMistakes || 3;
+      mistakeContainer.textContent = `${currentMistakes}/${maxMistakes}`;
+    }
+  }
+
+  async saveGameState() {
+    if (!this.gameId) return;
+
+    try {
+      const response = await fetch(`/api/games/${this.gameId}/save`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timer: this.gameData.timer,
+          // Add other state data as needed
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save game state");
+    } catch (error) {
+      console.error("Error saving game state:", error);
     }
   }
 
   // Timer Management
-  startTimer() {
-    if (this.timerInterval) clearInterval(this.timerInterval);
+  startTimer(savedTime = 0) {
+    // Clear any existing timer first
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
 
-    const startTime = Date.now() - (this.gameData.timer || 0) * 1000;
+    // Don't start timer if game is completed or failed
+    if (this.isPaused) {
+      return;
+    }
+
+    // Initialize timer display
     const timerDisplay = document.getElementById("timer");
+    const formatTime = (totalSeconds) => {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes.toString().padStart(2, "0")}:${seconds
+        .toString()
+        .padStart(2, "0")}`;
+    };
 
-    this.timerInterval = setInterval(() => {
+    // Start counting from the saved time
+    this.gameData.timer = savedTime;
+    timerDisplay.textContent = formatTime(this.gameData.timer);
+
+    this.timerInterval = setInterval(async () => {
       if (!this.isPaused) {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        timerDisplay.textContent = `${minutes
-          .toString()
-          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-        this.gameData.timer = elapsed;
+        this.gameData.timer++;
+        timerDisplay.textContent = formatTime(this.gameData.timer);
+
+        // Save game state every 10 seconds
+        if (this.gameData.timer % 10 === 0) {
+          await this.saveGameState();
+        }
       }
     }, 1000);
   }
@@ -410,10 +562,21 @@ class SudokuGame {
 
   // Game Completion Handlers
   handleGameOver() {
-    if (!this.gameData.mistakeChecking) return; // Don't handle game over if mistake checking is disabled
-
     this.stopTimer();
     this.isPaused = true;
+
+    // Remove any existing overlay first
+    const existingOverlay = document.querySelector(".game-completion");
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+
+    // Disable all input cells except initial values
+    document.querySelectorAll(".cell input").forEach((input) => {
+      if (!input.classList.contains("initial")) {
+        input.disabled = true;
+      }
+    });
 
     const boardContainer = document.querySelector(".board-container");
     const overlay = document.createElement("div");
@@ -442,8 +605,15 @@ class SudokuGame {
 
     try {
       const theme = document.body.getAttribute("data-theme") || "light";
+      const validateBtn = document.getElementById("validateBtn");
+      const check =
+        validateBtn.style.display === "none" ||
+        validateBtn.classList.contains("active");
+
       const response = await fetch(
-        `/api/games/${this.gameId}/image?theme=${theme}`
+        `/api/games/${this.gameId}/image?theme=${theme}${
+          check ? "&check=true" : ""
+        }`
       );
 
       if (!response.ok) throw new Error("Failed to download board");
@@ -465,10 +635,16 @@ class SudokuGame {
 
   // Navigation and UI Updates
   returnToMainMenu() {
+    // Save the current game state before returning to menu
+    if (this.gameId && !this.isPaused) {
+      this.saveGameState();
+    }
+
     this.stopTimer();
     this.gameId = null;
     this.gameData = null;
     this.selectedCell = null;
+    this.isPaused = false;
     document.getElementById("gameIdInput").value = "";
 
     // Remove any existing game completion overlays
@@ -603,21 +779,68 @@ class SudokuGame {
     document.querySelectorAll(".btn-back").forEach((button) => {
       button.addEventListener("click", () => this.showScreen("welcome"));
     });
+
+    document.getElementById("copyGameId").addEventListener("click", () => {
+      const gameId = this.gameId;
+      if (gameId) {
+        navigator.clipboard
+          .writeText(gameId)
+          .then(() => {
+            // Optional: Show feedback
+            const copyIcon = document.getElementById("copyGameId");
+            const originalClass = copyIcon.className;
+            copyIcon.className = "fas fa-check";
+            setTimeout(() => {
+              copyIcon.className = originalClass;
+            }, 1000);
+          })
+          .catch((err) => {
+            console.error("Failed to copy game ID:", err);
+          });
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && this.gameId && !this.isPaused) {
+        this.saveGameState();
+      }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (this.gameId && !this.isPaused) {
+        this.saveGameState();
+      }
+    });
   }
 
   handleKeyPress(e) {
     if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
       return;
 
-    if (/^[1-9]$/.test(e.key)) {
-      this.makeMove(this.selectedCell, e.key);
-    } else if (e.key === "Delete" || e.key === "Backspace") {
-      this.deleteMove(this.selectedCell);
-    } else if (
+    // Prevent the default behavior for number keys and arrow keys
+    if (
+      /^[1-9]$/.test(e.key) ||
+      e.key === "Delete" ||
+      e.key === "Backspace" ||
       ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
     ) {
       e.preventDefault();
-      this.moveFocus(e.key);
+    }
+
+    // Check if the input event is from keyboard
+    if (e.type === "keydown") {
+      // Only handle number inputs if there isn't already a value in the input
+      if (/^[1-9]$/.test(e.key) && !this.selectedCell.value) {
+        this.makeMove(this.selectedCell, e.key);
+      } else if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        this.selectedCell.value
+      ) {
+        this.deleteMove(this.selectedCell);
+      } else if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
+      ) {
+        this.moveFocus(e.key);
+      }
     }
   }
 

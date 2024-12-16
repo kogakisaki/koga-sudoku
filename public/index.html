@@ -61,15 +61,16 @@
       <!-- Game Screen -->
       <div id="gameScreen" class="screen">
         <div class="game-section">
+          <!-- Game Header -->
           <div class="game-header">
             <div class="game-info">
               <div class="game-title">
                 <h2>Sudoku</h2>
                 <div class="game-status">
                   <span id="difficultyBadge" class="badge">Easy</span>
-                  <div class="game-id-box">
-                    <i class="fas fa-hashtag"></i>
-                    <span id="gameId"></span>
+                  <div class="game-id-box" title="Click to copy Game ID">
+                    <i class="fas fa-copy" id="copyGameId"></i>
+                    <span id="gameId" style="display: none"></span>
                   </div>
                 </div>
               </div>
@@ -84,8 +85,32 @@
                 </div>
               </div>
             </div>
-            <div class="game-controls">
-              <div class="control-buttons">
+          </div>
+
+          <!-- Game Board -->
+          <div class="board-container">
+            <div class="board" id="board"></div>
+          </div>
+
+          <!-- Game Controls -->
+          <div class="controls-container">
+            <div class="game-actions">
+              <div class="action-buttons">
+                <button
+                  id="validateBtn"
+                  class="btn-check"
+                  style="display: none"
+                >
+                  <i class="fas fa-check-circle"></i> Check
+                </button>
+                <button id="retryBtn" class="btn-retry">
+                  <i class="fas fa-redo"></i> Retry
+                </button>
+                <button id="mainMenuBtn" class="btn-menu">
+                  <i class="fas fa-home"></i> Menu
+                </button>
+              </div>
+              <div class="utility-buttons">
                 <button
                   id="themeToggleGame"
                   class="btn-control"
@@ -102,25 +127,8 @@
                 </button>
               </div>
             </div>
-          </div>
 
-          <div class="board-container">
-            <div class="board" id="board"></div>
-          </div>
-
-          <div class="controls-container">
-            <div class="game-actions">
-              <button id="validateBtn" class="btn-check" style="display: none">
-                <i class="fas fa-check-circle"></i> Check
-              </button>
-              <button id="retryBtn" class="btn-retry">
-                <i class="fas fa-redo"></i> Retry
-              </button>
-              <button id="mainMenuBtn" class="btn-menu">
-                <i class="fas fa-home"></i> Menu
-              </button>
-            </div>
-
+            <!-- Number Pad -->
             <div class="number-pad">
               <button class="num-btn" data-number="1">1</button>
               <button class="num-btn" data-number="2">2</button>

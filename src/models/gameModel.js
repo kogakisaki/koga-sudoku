@@ -20,10 +20,10 @@ class GameModel {
       status: "active",
       hintsRemaining: difficulties[difficulty].hintsAllowed,
       mistakes: mistakeChecking ? 0 : null,
-      maxMistakes: mistakeChecking ? 5 : null,
+      maxMistakes: mistakeChecking ? 3 : null,
       timer: 0,
       userValues: [],
-      mistakeChecking, // Add mistake checking setting
+      mistakeChecking,
     };
   }
 
@@ -102,16 +102,25 @@ class GameModel {
   static validateMove(game, row, col, value) {
     if (value === 0) return true; // Allow deletion
     if (!game.mistakeChecking) return true; // Always return true if mistake checking is disabled
+    if (game.status === "failed") return false; // Don't allow moves if game is failed
+    if (game.mistakes >= game.maxMistakes) return false; // Don't allow moves if max mistakes reached
     return game.solution[row][col] === value;
   }
 
   static isGameComplete(game) {
+    // Don't check completion if game is failed
+    if (game.status === "failed") return false;
+
     for (let i = 0; i < 9; i++) {
       for (let j = 0; j < 9; j++) {
         if (game.board[i][j] !== game.solution[i][j]) return false;
       }
     }
     return true;
+  }
+
+  static isGameFailed(game) {
+    return game.mistakeChecking && game.mistakes >= game.maxMistakes;
   }
 
   static shuffleArray(array) {
@@ -145,6 +154,46 @@ class GameModel {
     if (index !== -1) {
       game.userValues.splice(index, 1);
     }
+  }
+
+  static validateBoard(game) {
+    const validation = [];
+    let isComplete = true;
+
+    for (let i = 0; i < 9; i++) {
+      for (let j = 0; j < 9; j++) {
+        const currentValue = game.board[i][j];
+        const correctValue = game.solution[i][j];
+
+        // Only validate cells that are either empty or filled by user
+        if (this.isUserValue(game, i, j) || currentValue === 0) {
+          validation.push({
+            row: i,
+            col: j,
+            isEmpty: currentValue === 0,
+            isValid: currentValue === correctValue,
+          });
+
+          if (currentValue !== correctValue) {
+            isComplete = false;
+          }
+        }
+      }
+    }
+
+    return {
+      validation,
+      isComplete,
+      isFailed: this.isGameFailed(game),
+    };
+  }
+
+  static canMakeMove(game) {
+    return (
+      game.status !== "failed" &&
+      game.status !== "completed" &&
+      (!game.mistakeChecking || game.mistakes < game.maxMistakes)
+    );
   }
 }
 
