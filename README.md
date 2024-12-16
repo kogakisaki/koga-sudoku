@@ -69,7 +69,7 @@ git clone https://github.com/kogakisaki/koga-sudoku
 2. Install dependencies
 
 ```bash
-cd sudoku-game
+cd koga-sudoku
 npm install
 ```
 
