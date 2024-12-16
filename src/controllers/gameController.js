@@ -187,13 +187,14 @@ class GameController {
         id,
         ...newGame,
         userValues: [],
-        createdAt: new Date().toISOString(),
+        createdAt: oldGame.createdAt,
         lastUpdated: new Date().toISOString(),
       };
 
       await this.saveGame(id, gameData);
       res.json(gameData);
     } catch (error) {
+      console.error("Retry game error:", error);
       res.status(500).json({ error: "Failed to retry game" });
     }
   }

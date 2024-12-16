@@ -739,9 +739,6 @@ class SudokuGame {
 
     // Game Controls
     document
-      .getElementById("retryBtn")
-      .addEventListener("click", () => this.retryGame());
-    document
       .getElementById("mainMenuBtn")
       .addEventListener("click", () => this.returnToMainMenu());
     document
@@ -750,6 +747,50 @@ class SudokuGame {
     document
       .getElementById("downloadBtn")
       .addEventListener("click", () => this.downloadBoard());
+
+    const retryBtn = document.getElementById("retryBtn");
+    const retryHandler = async () => {
+      if (this.gameId) {
+        try {
+          const response = await fetch(`/api/games/${this.gameId}/retry`, {
+            method: "PUT",
+          });
+
+          if (!response.ok) throw new Error("Failed to retry game");
+
+          const data = await response.json();
+          this.gameData = data;
+          this.isPaused = false;
+
+          // Remove any existing game completion overlays
+          const existingOverlay = document.querySelector(".game-completion");
+          if (existingOverlay) {
+            existingOverlay.remove();
+          }
+
+          // Reset and restart the game
+          this.createBoard();
+          const timerDisplay = document.getElementById("timer");
+          timerDisplay.textContent = "00:00";
+          this.startTimer(0);
+          this.updateStats();
+        } catch (error) {
+          console.error("Error retrying game:", error);
+          alert("Failed to retry game. Please try again.");
+        }
+      }
+    };
+
+    // Store the handler in the class instance
+    if (!this.retryHandler) {
+      this.retryHandler = retryHandler;
+    } else {
+      // Remove old handler if it exists
+      retryBtn.removeEventListener("click", this.retryHandler);
+    }
+
+    // Add new handler
+    retryBtn.addEventListener("click", this.retryHandler);
 
     // Theme Toggle
     document
