@@ -1,6 +1,6 @@
 // src/models/gameModel.js
 class GameModel {
-  static createNewGame(difficulty = "easy") {
+  static createNewGame(difficulty = "easy", mistakeChecking = true) {
     const difficulties = {
       easy: { cellsToRemove: 30, hintsAllowed: 5 },
       medium: { cellsToRemove: 40, hintsAllowed: 3 },
@@ -19,10 +19,11 @@ class GameModel {
       solution,
       status: "active",
       hintsRemaining: difficulties[difficulty].hintsAllowed,
-      mistakes: 0,
-      maxMistakes: 3,
+      mistakes: mistakeChecking ? 0 : null,
+      maxMistakes: mistakeChecking ? 5 : null,
       timer: 0,
-      userValues: [], // Initialize userValues array
+      userValues: [],
+      mistakeChecking, // Add mistake checking setting
     };
   }
 
@@ -100,6 +101,7 @@ class GameModel {
 
   static validateMove(game, row, col, value) {
     if (value === 0) return true; // Allow deletion
+    if (!game.mistakeChecking) return true; // Always return true if mistake checking is disabled
     return game.solution[row][col] === value;
   }
 
@@ -120,7 +122,6 @@ class GameModel {
     return array;
   }
 
-  // New helper methods for user values
   static isUserValue(game, row, col) {
     return game.userValues?.some((v) => v.row === row && v.col === col);
   }

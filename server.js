@@ -71,18 +71,20 @@ app.get("/api/games/:id/image", async (req, res) => {
             lines: "#ffffff",
             text: "#ffffff",
             gridLabels: "rgba(255, 255, 255, 0.7)",
-            userInput: "#64b5f6", // Matches dark theme --user-input-color
-            highlight: "rgba(76, 175, 80, 0.2)", // Matches dark theme --highlight-user-value
-            initial: "#ffffff", // Matches dark theme --initial-number-color
+            userInput: "#64b5f6",
+            highlight: "rgba(76, 175, 80, 0.2)",
+            initial: "#ffffff",
+            overlay: "rgba(42, 42, 42, 0.8)",
           }
         : {
             background: "#ffffff",
             lines: "#000000",
             text: "#000000",
             gridLabels: "rgba(0, 0, 0, 0.7)",
-            userInput: "#2196f3", // Matches light theme --user-input-color
-            highlight: "rgba(76, 175, 80, 0.3)", // Matches light theme --highlight-user-value
-            initial: "#333333", // Matches light theme --initial-number-color
+            userInput: "#2196f3",
+            highlight: "rgba(76, 175, 80, 0.3)",
+            initial: "#333333",
+            overlay: "rgba(255, 255, 255, 0.8)",
           };
 
     // Draw background
@@ -166,6 +168,22 @@ app.get("/api/games/:id/image", async (req, res) => {
         ctx.lineTo(boardLeft + boardSize, boardTop + i * cellSize);
         ctx.stroke();
       }
+    }
+
+    // Apply overlay if game is completed or failed
+    if (gameData.status === "completed" || gameData.status === "failed") {
+      ctx.fillStyle = colors.overlay;
+      ctx.fillRect(boardLeft, boardTop, boardSize, boardSize);
+
+      ctx.fillStyle = colors.text;
+      ctx.font = '24px "Rubik Bold"';
+      ctx.fillText(
+        gameData.status === "completed"
+          ? "Congratulations! Puzzle Completed!"
+          : "Game Over! Too many mistakes!",
+        canvasWidth / 2,
+        boardTop + boardSize / 2
+      );
     }
 
     // Draw footer (game ID)

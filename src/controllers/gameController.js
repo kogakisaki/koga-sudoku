@@ -7,14 +7,14 @@ const GameModel = require("../models/gameModel");
 class GameController {
   async createNewGame(req, res) {
     try {
-      const { difficulty } = req.body;
+      const { difficulty, mistakeChecking } = req.body;
       const gameId = uuidv4();
-      const game = GameModel.createNewGame(difficulty);
+      const game = GameModel.createNewGame(difficulty, mistakeChecking);
 
       const gameData = {
         id: gameId,
         ...game,
-        userValues: [], // Initialize empty array for user values
+        userValues: [],
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       };
@@ -36,7 +36,6 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
-      // Initialize userValues if not present
       if (!game.userValues) {
         game.userValues = [];
       }
@@ -57,14 +56,11 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
-      // Initialize userValues if not present
       if (!game.userValues) {
         game.userValues = [];
       }
 
-      // Handle delete move (value = 0)
       if (value === 0) {
-        // Remove from userValues if it exists
         const index = game.userValues.findIndex(
           (v) => v.row === row && v.col === col
         );
@@ -83,13 +79,15 @@ class GameController {
         });
       }
 
-      // Handle regular move
-      const isValid = GameModel.validateMove(game, row, col, value);
-      if (isValid) {
+      // Check if the move is valid against the solution
+      const isValid = game.mistakeChecking
+        ? GameModel.validateMove(game, row, col, value)
+        : true;
+
+      if (isValid || !game.mistakeChecking) {
         game.board[row][col] = value;
         game.lastUpdated = new Date().toISOString();
 
-        // Add to userValues if not already present
         if (!game.userValues.some((v) => v.row === row && v.col === col)) {
           game.userValues.push({ row, col });
         }
@@ -98,7 +96,7 @@ class GameController {
           game.status = "completed";
           game.completedAt = new Date().toISOString();
         }
-      } else {
+      } else if (game.mistakeChecking) {
         game.mistakes++;
         if (game.mistakes >= game.maxMistakes) {
           game.status = "failed";
@@ -118,6 +116,51 @@ class GameController {
     }
   }
 
+  async checkGame(req, res) {
+    try {
+      const { id } = req.params;
+      const game = await this.loadGame(id);
+
+      if (!game) {
+        return res.status(404).json({ error: "Game not found" });
+      }
+
+      // Create an array to store the validation results
+      const validation = [];
+
+      // Check each cell
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+          const currentValue = game.board[i][j];
+          const correctValue = game.solution[i][j];
+
+          // Only check non-initial cells (cells that can be modified by the user)
+          if (
+            !game.userValues.some((v) => v.row === i && v.col === j) &&
+            currentValue !== 0
+          ) {
+            continue;
+          }
+
+          validation.push({
+            row: i,
+            col: j,
+            isEmpty: currentValue === 0,
+            isValid: currentValue === correctValue,
+          });
+        }
+      }
+
+      res.json({
+        validation,
+        isComplete: GameModel.isGameComplete(game),
+      });
+    } catch (error) {
+      console.error("Check game error:", error);
+      res.status(500).json({ error: "Failed to check game" });
+    }
+  }
+
   async retryGame(req, res) {
     try {
       const { id } = req.params;
@@ -127,11 +170,14 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
-      const newGame = GameModel.createNewGame(oldGame.difficulty);
+      const newGame = GameModel.createNewGame(
+        oldGame.difficulty,
+        oldGame.mistakeChecking
+      );
       const gameData = {
         id,
         ...newGame,
-        userValues: [], // Reset user values for new game
+        userValues: [],
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
       };
@@ -153,12 +199,10 @@ class GameController {
         return res.status(404).json({ error: "Game not found" });
       }
 
-      // Initialize userValues if not present
       if (!game.userValues) {
         game.userValues = [];
       }
 
-      // Remove from userValues if it exists
       const index = game.userValues.findIndex(
         (v) => v.row === row && v.col === col
       );

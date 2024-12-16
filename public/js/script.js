@@ -1,5 +1,4 @@
-// script.js - Part 1: Core Game Class and Initialization
-
+// script.js
 class SudokuGame {
   constructor() {
     // Game state properties
@@ -25,12 +24,12 @@ class SudokuGame {
   }
 
   // Game Initialization
-  async startNewGame(difficulty) {
+  async startNewGame(difficulty, mistakeChecking = true) {
     try {
       const response = await fetch("/api/games/new", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ difficulty }),
+        body: JSON.stringify({ difficulty, mistakeChecking }),
       });
 
       if (!response.ok) throw new Error("Failed to create new game");
@@ -45,6 +44,18 @@ class SudokuGame {
       this.updateStats();
       this.updateDifficultyBadge(difficulty);
       this.showGameId();
+
+      // Show or hide mistake elements based on mistake checking
+      const mistakeContainer = document.getElementById("mistakeContainer");
+      const validateBtn = document.getElementById("validateBtn");
+
+      if (!mistakeChecking) {
+        mistakeContainer.style.display = "none";
+        validateBtn.style.display = "block";
+      } else {
+        mistakeContainer.style.display = "flex";
+        validateBtn.style.display = "none";
+      }
     } catch (error) {
       console.error("Error starting new game:", error);
       alert("Failed to start new game. Please try again.");
@@ -66,6 +77,18 @@ class SudokuGame {
       this.updateStats();
       this.updateDifficultyBadge(data.difficulty);
       this.showGameId();
+
+      // Show or hide mistake elements based on mistake checking
+      const mistakeContainer = document.getElementById("mistakeContainer");
+      const validateBtn = document.getElementById("validateBtn");
+
+      if (!data.mistakeChecking) {
+        mistakeContainer.style.display = "none";
+        validateBtn.style.display = "block";
+      } else {
+        mistakeContainer.style.display = "flex";
+        validateBtn.style.display = "none";
+      }
     } catch (error) {
       console.error("Error loading game:", error);
       alert("Failed to load game. Please check the Game ID and try again.");
@@ -123,7 +146,6 @@ class SudokuGame {
       input.addEventListener("input", (e) => this.handleCellInput(e));
     });
   }
-
   handleCellFocus(e) {
     if (this.isPaused || e.target.disabled) return;
 
@@ -208,6 +230,7 @@ class SudokuGame {
       }
     });
   }
+
   // Game Moves
   async makeMove(cell, value) {
     if (!this.gameId || cell.disabled || this.isPaused) return;
@@ -230,7 +253,7 @@ class SudokuGame {
       const data = await response.json();
       this.gameData = data.game;
 
-      if (data.isValid) {
+      if (data.isValid || !this.gameData.mistakeChecking) {
         cell.value = value;
         cell.classList.remove("error");
         cell.classList.add("correct");
@@ -269,7 +292,7 @@ class SudokuGame {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ row, col, value: 0 }), // Send 0 to indicate deletion
+        body: JSON.stringify({ row, col, value: 0 }),
       });
 
       if (!response.ok) throw new Error("Failed to delete move");
@@ -289,82 +312,59 @@ class SudokuGame {
     }
   }
 
-  handleKeyPress(e) {
-    if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
-      return;
-
-    if (/^[1-9]$/.test(e.key)) {
-      this.makeMove(this.selectedCell, e.key);
-    } else if (e.key === "Delete" || e.key === "Backspace") {
-      this.deleteMove(this.selectedCell);
-    } else if (
-      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
-    ) {
-      e.preventDefault();
-      this.moveFocus(e.key);
-    }
-  }
-
   async validateGame() {
     if (!this.gameId || this.isPaused) return;
 
-    const incompleteCells = document.querySelectorAll(
-      ".cell input:not([disabled]):not([value])"
-    );
-    if (incompleteCells.length > 0) {
-      alert("Please fill in all cells before validating");
-      return;
-    }
-
-    let isValid = true;
-    document.querySelectorAll(".cell input").forEach((input) => {
-      if (!input.disabled) {
-        const row = parseInt(input.dataset.row);
-        const col = parseInt(input.dataset.col);
-        if (parseInt(input.value) !== this.gameData.solution[row][col]) {
-          isValid = false;
-          input.classList.add("error");
-        } else {
-          input.classList.add("correct");
-        }
-      }
-    });
-
-    if (isValid) {
-      alert("Congratulations! All entries are correct!");
-    } else {
-      alert("There are some mistakes. Keep trying!");
-      setTimeout(() => {
-        document.querySelectorAll(".cell input.error").forEach((input) => {
-          input.classList.remove("error");
-        });
-      }, 2000);
-    }
-  }
-
-  async retryGame() {
-    if (!this.gameId) return;
-
     try {
-      const response = await fetch(`/api/games/${this.gameId}/retry`, {
-        method: "PUT",
-      });
-
-      if (!response.ok) throw new Error("Failed to retry game");
+      const response = await fetch(`/api/games/${this.gameId}/check`);
+      if (!response.ok) throw new Error("Failed to check game");
 
       const data = await response.json();
-      this.gameData = data;
+      let hasErrors = false;
 
-      this.createBoard();
-      this.startTimer();
-      this.updateStats();
+      // Reset all cell states first
+      document
+        .querySelectorAll(".cell input:not([disabled])")
+        .forEach((input) => {
+          input.classList.remove("error", "correct");
+          input.parentElement.classList.remove("error"); // Remove error from cell div
+        });
+
+      // Apply validation results
+      data.validation.forEach((result) => {
+        const cell = document.querySelector(
+          `.cell input[data-row="${result.row}"][data-col="${result.col}"]`
+        );
+
+        if (!cell || cell.disabled) return;
+
+        if (result.isEmpty || !result.isValid) {
+          cell.classList.add("error");
+          cell.parentElement.classList.add("error"); // Add error to cell div
+          hasErrors = true;
+        }
+      });
+
+      if (!hasErrors && data.isComplete) {
+        this.handleGameWin();
+      } else if (hasErrors) {
+        // Remove error highlighting after delay
+        setTimeout(() => {
+          document.querySelectorAll(".cell input.error").forEach((input) => {
+            input.classList.remove("error");
+            input.parentElement.classList.remove("error"); // Remove error from cell div
+          });
+        }, 2000);
+      }
     } catch (error) {
-      console.error("Error retrying game:", error);
-      alert("Failed to retry game");
+      console.error("Error checking game:", error);
+      alert("Failed to check game");
     }
   }
 
   handleMistake() {
+    if (!this.gameData.mistakeChecking) return; // Don't handle mistakes if checking is disabled
+
     this.gameData.mistakes++;
     this.updateStats();
 
@@ -375,10 +375,12 @@ class SudokuGame {
 
   updateStats() {
     if (!this.gameData) return;
-    document.getElementById(
-      "mistakes"
-    ).textContent = `${this.gameData.mistakes}/${this.gameData.maxMistakes}`;
+    const mistakeContainer = document.getElementById("mistakes");
+    if (this.gameData.mistakeChecking) {
+      mistakeContainer.textContent = `${this.gameData.mistakes}/${this.gameData.maxMistakes}`;
+    }
   }
+
   // Timer Management
   startTimer() {
     if (this.timerInterval) clearInterval(this.timerInterval);
@@ -389,11 +391,11 @@ class SudokuGame {
     this.timerInterval = setInterval(() => {
       if (!this.isPaused) {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const minutes = Math.floor(elapsed / 60)
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        timerDisplay.textContent = `${minutes
           .toString()
-          .padStart(2, "0");
-        const seconds = (elapsed % 60).toString().padStart(2, "0");
-        timerDisplay.textContent = `${minutes}:${seconds}`;
+          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
         this.gameData.timer = elapsed;
       }
     }, 1000);
@@ -408,9 +410,16 @@ class SudokuGame {
 
   // Game Completion Handlers
   handleGameOver() {
+    if (!this.gameData.mistakeChecking) return; // Don't handle game over if mistake checking is disabled
+
     this.stopTimer();
     this.isPaused = true;
-    document.getElementById("gameOverModal").classList.add("active");
+
+    const boardContainer = document.querySelector(".board-container");
+    const overlay = document.createElement("div");
+    overlay.className = "game-completion";
+    overlay.textContent = "Game Over! Too many mistakes!";
+    boardContainer.appendChild(overlay);
   }
 
   handleGameWin() {
@@ -420,13 +429,11 @@ class SudokuGame {
     const minutes = Math.floor(this.gameData.timer / 60);
     const seconds = this.gameData.timer % 60;
 
-    document.getElementById(
-      "finalTime"
-    ).textContent = `${minutes}m ${seconds}s`;
-    document.getElementById("finalMistakes").textContent =
-      this.gameData.mistakes;
-
-    document.getElementById("victoryModal").classList.add("active");
+    const boardContainer = document.querySelector(".board-container");
+    const overlay = document.createElement("div");
+    overlay.className = "game-completion";
+    overlay.innerHTML = `Congratulations!<br>Time: ${minutes}m ${seconds}s`;
+    boardContainer.appendChild(overlay);
   }
 
   // Board Download
@@ -463,6 +470,13 @@ class SudokuGame {
     this.gameData = null;
     this.selectedCell = null;
     document.getElementById("gameIdInput").value = "";
+
+    // Remove any existing game completion overlays
+    const existingOverlay = document.querySelector(".game-completion");
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+
     this.showScreen("welcome");
   }
 
@@ -515,48 +529,7 @@ class SudokuGame {
     }
   }
 
-  // Modal Management
-  hideModals() {
-    document.querySelectorAll(".modal").forEach((modal) => {
-      modal.classList.remove("active");
-    });
-    this.isPaused = false;
-    if (this.gameData && this.gameData.status === "active") {
-      this.startTimer();
-    }
-  }
-
   // Event Listeners Management
-  initializeModalListeners() {
-    // Game Over Modal
-    document.getElementById("retryGameBtn").addEventListener("click", () => {
-      this.hideModals();
-      this.retryGame();
-    });
-
-    document.getElementById("quitToMenuBtn").addEventListener("click", () => {
-      this.hideModals();
-      this.returnToMainMenu();
-    });
-
-    // Victory Modal
-    document
-      .getElementById("newGameAfterWinBtn")
-      .addEventListener("click", () => {
-        this.hideModals();
-        this.returnToMainMenu();
-      });
-
-    // Close modals when clicking outside
-    document.querySelectorAll(".modal").forEach((modal) => {
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-          this.hideModals();
-        }
-      });
-    });
-  }
-  // Initialize all event listeners
   initializeEventListeners() {
     // Welcome Screen
     document.getElementById("newGameBtn").addEventListener("click", () => {
@@ -580,24 +553,24 @@ class SudokuGame {
     document
       .querySelectorAll(".difficulty-buttons button")
       .forEach((button) => {
-        button.addEventListener("click", () =>
-          this.startNewGame(button.dataset.difficulty)
-        );
+        button.addEventListener("click", () => {
+          const mistakeChecking = confirm(
+            "Enable mistake checking? (Cancel for No)"
+          );
+          this.startNewGame(button.dataset.difficulty, mistakeChecking);
+        });
       });
 
     // Game Controls
     document
       .getElementById("retryBtn")
       .addEventListener("click", () => this.retryGame());
-
     document
       .getElementById("mainMenuBtn")
       .addEventListener("click", () => this.returnToMainMenu());
-
     document
       .getElementById("validateBtn")
       .addEventListener("click", () => this.validateGame());
-
     document
       .getElementById("downloadBtn")
       .addEventListener("click", () => this.downloadBoard());
@@ -614,10 +587,8 @@ class SudokuGame {
       button.addEventListener("click", () => {
         if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
           return;
-
         const number = button.dataset.number;
         if (number === "0") {
-          // Eraser functionality
           this.deleteMove(this.selectedCell);
         } else {
           this.makeMove(this.selectedCell, number);
@@ -632,12 +603,24 @@ class SudokuGame {
     document.querySelectorAll(".btn-back").forEach((button) => {
       button.addEventListener("click", () => this.showScreen("welcome"));
     });
-
-    // Initialize modal listeners
-    this.initializeModalListeners();
   }
 
-  // Cell Navigation
+  handleKeyPress(e) {
+    if (!this.selectedCell || this.isPaused || this.selectedCell.disabled)
+      return;
+
+    if (/^[1-9]$/.test(e.key)) {
+      this.makeMove(this.selectedCell, e.key);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      this.deleteMove(this.selectedCell);
+    } else if (
+      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)
+    ) {
+      e.preventDefault();
+      this.moveFocus(e.key);
+    }
+  }
+
   moveFocus(direction) {
     if (!this.selectedCell) return;
 
@@ -668,36 +651,6 @@ class SudokuGame {
       nextCell.focus();
       this.highlightRelatedCells(nextCell);
     }
-  }
-
-  // Helper Methods
-  isValidPosition(row, col) {
-    return row >= 0 && row < 9 && col >= 0 && col < 9;
-  }
-
-  getBoxStart(index) {
-    return Math.floor(index / 3) * 3;
-  }
-
-  getCellsInSameUnit(row, col) {
-    const cells = new Set();
-    // Add cells in same row
-    for (let i = 0; i < 9; i++) {
-      cells.add(`${row},${i}`);
-    }
-    // Add cells in same column
-    for (let i = 0; i < 9; i++) {
-      cells.add(`${i},${col}`);
-    }
-    // Add cells in same box
-    const boxRow = this.getBoxStart(row);
-    const boxCol = this.getBoxStart(col);
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        cells.add(`${boxRow + i},${boxCol + j}`);
-      }
-    }
-    return cells;
   }
 }
 

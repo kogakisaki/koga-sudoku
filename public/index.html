@@ -78,7 +78,7 @@
                   <i class="far fa-clock"></i>
                   <span id="timer">00:00</span>
                 </div>
-                <div class="mistakes">
+                <div class="mistakes" id="mistakeContainer">
                   <i class="fas fa-times-circle"></i>
                   <span id="mistakes">0/3</span>
                 </div>
@@ -110,7 +110,7 @@
 
           <div class="controls-container">
             <div class="game-actions">
-              <button id="validateBtn" class="btn-check">
+              <button id="validateBtn" class="btn-check" style="display: none">
                 <i class="fas fa-check-circle"></i> Check
               </button>
               <button id="retryBtn" class="btn-retry">
@@ -135,39 +135,6 @@
                 <i class="fas fa-eraser"></i>
               </button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Game Over Modal -->
-      <div id="gameOverModal" class="modal">
-        <div class="modal-content">
-          <h2>Game Over</h2>
-          <p>Too many mistakes! Would you like to try again?</p>
-          <div class="modal-buttons">
-            <button id="retryGameBtn" class="btn-primary">
-              <i class="fas fa-redo"></i> Retry
-            </button>
-            <button id="quitToMenuBtn" class="btn-secondary">
-              <i class="fas fa-home"></i> Main Menu
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Victory Modal -->
-      <div id="victoryModal" class="modal">
-        <div class="modal-content">
-          <h2>Congratulations!</h2>
-          <p>You've completed the puzzle!</p>
-          <div class="stats">
-            <p>Time: <span id="finalTime">00:00</span></p>
-            <p>Mistakes: <span id="finalMistakes">0</span></p>
-          </div>
-          <div class="modal-buttons">
-            <button id="newGameAfterWinBtn" class="btn-primary">
-              <i class="fas fa-play"></i> New Game
-            </button>
           </div>
         </div>
       </div>

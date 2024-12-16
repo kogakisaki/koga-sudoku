@@ -23,6 +23,7 @@
   --check-color: #9c27b0;
   --hint-color: #ff9800;
   --shadow-color: rgba(0, 0, 0, 0.1);
+  --overlay-bg: rgba(255, 255, 255, 0.8);
 }
 
 [data-theme="dark"] {
@@ -40,6 +41,7 @@
   --user-input-color: #64b5f6;
   --initial-number-color: var(--text-color);
   --shadow-color: rgba(0, 0, 0, 0.3);
+  --overlay-bg: rgba(42, 42, 42, 0.8);
 }
 
 * {
@@ -240,6 +242,7 @@ body {
   display: flex;
   justify-content: center;
   margin: 20px 0;
+  position: relative;
 }
 
 .board {
@@ -319,6 +322,26 @@ body {
 
 .cell.correct input {
   color: var(--correct-color);
+}
+
+/* Game Completion */
+.game-completion {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--overlay-bg);
+  color: var(--text-color);
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 10;
+  border-radius: 8px;
+  padding: 20px;
 }
 
 /* Game Controls */
@@ -401,26 +424,32 @@ button {
   background: var(--button-bg);
   color: white;
 }
+
 .btn-secondary {
   background: var(--medium-color);
   color: white;
 }
+
 .btn-easy {
   background: var(--easy-color);
   color: white;
 }
+
 .btn-medium {
   background: var(--medium-color);
   color: white;
 }
+
 .btn-hard {
   background: var(--hard-color);
   color: white;
 }
+
 .btn-check {
   background: var(--check-color);
   color: white;
 }
+
 .btn-retry {
   background: var(--hint-color);
   color: white;
@@ -433,40 +462,6 @@ button:hover {
 
 button:active {
   transform: translateY(0);
-}
-
-/* Modal */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal.active {
-  display: flex;
-}
-
-.modal-content {
-  background: var(--container-bg);
-  padding: 30px;
-  border-radius: 15px;
-  max-width: 400px;
-  width: 90%;
-  text-align: center;
-}
-
-.modal-buttons {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  margin-top: 20px;
 }
 
 /* Animations */
@@ -550,6 +545,11 @@ button:active {
   .btn-control {
     width: 40px;
     height: 40px;
+  }
+
+  .game-completion {
+    font-size: 20px;
+    padding: 15px;
   }
 }
 
